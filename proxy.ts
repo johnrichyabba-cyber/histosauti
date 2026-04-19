@@ -1,0 +1,19 @@
+import { NextResponse, type NextRequest } from "next/server";
+
+export function proxy(request: NextRequest) {
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Run on everything except:
+     * - api routes
+     * - next internal assets
+     * - static files
+     * - image optimizer
+     * - favicon
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\..*).*)",
+  ],
+};
