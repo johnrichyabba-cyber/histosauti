@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: histosauti
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_MODEL
+        value: gpt-5
+      - key: NEXT_PUBLIC_APP_URL
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
