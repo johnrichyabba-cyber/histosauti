@@ -134,7 +134,7 @@ export default async function CategoriesPage({
 
                   <div className="mt-6">
                     <Link
-                      href={`/stories`}
+                      href="/stories"
                       className="inline-flex rounded-full bg-[#d4b26a] px-5 py-3 text-sm font-semibold text-black transition hover:opacity-90"
                     >
                       Fungua stories zote
