@@ -6,14 +6,14 @@ import Footer from "@/components/layout/footer";
 export const metadata: Metadata = {
   title: "HistoSauti",
   description:
-    "Portal ya documentary storytelling ya Kiswahili yenye true stories, narration, subtitles, na cinematic experience.",
+    "Portal ya documentary storytelling ya Kiswahili yenye simulizi za kweli, audio, subtitles, na cinematic experience.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
+type RootLayoutProps = {
   children: React.ReactNode;
-}>) {
+};
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="sw">
       <body className="min-h-screen bg-[#050816] text-white antialiased">
