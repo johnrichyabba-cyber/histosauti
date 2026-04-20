@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import StoryCinematicPlayer from "@/components/story-cinematic-player";
-import { getLatestStories, getStoryBySlug } from "@/lib/stories";
+import { getStories } from "@/lib/stories";
 
 type StoryPageProps = {
   params: Promise<{
@@ -9,292 +9,305 @@ type StoryPageProps = {
   }>;
 };
 
-function formatDuration(durationSeconds?: number | null) {
-  if (!durationSeconds || durationSeconds <= 0) return "12 min";
-  return `${Math.max(1, Math.round(durationSeconds / 60))} min`;
+function asString(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return fallback;
 }
 
-function safeString(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0 ? value : null;
+function asBoolean(value: unknown): boolean {
+  return value === true || value === "true" || value === 1;
 }
 
-function safeStringArray(value: unknown): string[] {
+function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(
-    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  return value
+    .map((item) => asString(item))
+    .filter((item) => item.trim().length > 0);
+}
+
+function asScenes(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((scene, index) => {
+      if (!scene || typeof scene !== "object") return null;
+
+      const item = scene as Record<string, unknown>;
+
+      return {
+        id: asString(item.id, `scene-${index + 1}`),
+        title: asString(item.title, `Scene ${index + 1}`),
+        text:
+          asString(item.text) ||
+          asString(item.description) ||
+          asString(item.caption),
+        imageUrl:
+          asString(item.imageUrl) ||
+          asString(item.image_url) ||
+          asString(item.image),
+        duration:
+          typeof item.duration === "number"
+            ? item.duration
+            : Number(item.duration ?? 0) || undefined,
+      };
+    })
+    .filter(Boolean);
+}
+
+function pickStoryDescription(story: Record<string, unknown>) {
+  return (
+    asString(story.short_description) ||
+    asString(story.description) ||
+    asString(story.summary) ||
+    asString(story.body).slice(0, 220) ||
+    asString(story.content).slice(0, 220) ||
+    "Hakuna maelezo ya story kwa sasa."
   );
 }
 
-type SceneItem = {
-  id: string;
-  title: string;
-  time: string;
-  summary: string;
-  subtitle: string;
-  imageUrl: string | null;
-  ambienceUrl: string | null;
-};
-
-function safeScenes(value: unknown): SceneItem[] {
-  if (!Array.isArray(value)) return [];
-
-  return value.map((scene, index) => {
-    const item = scene as Record<string, unknown>;
-
-    return {
-      id:
-        typeof item.id === "string" && item.id.trim().length > 0
-          ? item.id
-          : `scene-${index + 1}`,
-      title:
-        typeof item.title === "string" && item.title.trim().length > 0
-          ? item.title
-          : `Scene ${index + 1}`,
-      time:
-        typeof item.time === "string" && item.time.trim().length > 0
-          ? item.time
-          : "0:00",
-      summary: typeof item.summary === "string" ? item.summary : "",
-      subtitle:
-        typeof item.subtitle === "string"
-          ? item.subtitle
-          : typeof item.summary === "string"
-            ? item.summary
-            : "",
-      imageUrl:
-        typeof item.imageUrl === "string"
-          ? item.imageUrl
-          : typeof item.image_url === "string"
-            ? (item.image_url as string)
-            : null,
-      ambienceUrl:
-        typeof item.ambienceUrl === "string"
-          ? item.ambienceUrl
-          : typeof item.ambience_url === "string"
-            ? (item.ambience_url as string)
-            : null,
-    };
-  });
+function pickStoryBody(story: Record<string, unknown>) {
+  return (
+    asString(story.body) ||
+    asString(story.content) ||
+    asString(story.story) ||
+    ""
+  );
 }
 
 export default async function StoryDetailPage({ params }: StoryPageProps) {
   const { slug } = await params;
-  const story = await getStoryBySlug(slug);
+  const stories = await getStories();
 
-  if (!story) {
+  const matched = stories.find((item) => item.slug === slug);
+
+  if (!matched) {
     notFound();
   }
 
-  const rawStory = story as Record<string, unknown>;
+  const story = matched as Record<string, unknown>;
+  const allStories = stories as Array<Record<string, unknown>>;
 
+  const id = asString(story.id, slug);
+  const title = asString(story.title, "Untitled story");
+  const storySlug = asString(story.slug, slug);
+  const category = asString(story.category, "General");
+  const description = pickStoryDescription(story);
+  const body = pickStoryBody(story);
+
+  const subtitleUrl = asString(story.subtitle_url);
+  const narrationUrl = asString(story.audio_url);
   const posterUrl =
-    safeString(rawStory.cover_image_url) ||
-    safeString(rawStory.featured_image) ||
-    safeString(rawStory.image_url) ||
-    "/images/placeholders/story-cover.jpg";
+    asString(story.poster_url) ||
+    asString(story.cover_image_url) ||
+    asString(story.image_url);
+  const ambianceUrl = asString(story.ambiance_url);
+  const musicUrl = asString(story.music_url);
 
-  const narrationUrl =
-    safeString(rawStory.narration_url) ||
-    safeString(rawStory.audio_url) ||
-    null;
+  const featured = asBoolean(story.featured);
+  const galleryImages = asStringArray(story.gallery_images);
+  const scenes = asScenes(story.scenes);
 
-  const ambienceUrl = safeString(rawStory.ambience_url);
-  const musicUrl =
-    safeString(rawStory.music_url) || safeString(rawStory.soundtrack_url);
-
-  const galleryImages = safeStringArray(rawStory.gallery_images);
-  const scenes = safeScenes(rawStory.scenes);
-
-  const relatedStories = (await getLatestStories(6)).filter(
-    (item) => item.slug !== story.slug,
-  );
-
-  const fallbackText = [
-    story.title,
-    story.short_description,
-    story.story_summary,
-    ...scenes.map((scene) => scene.subtitle || scene.summary),
-  ]
-    .filter(Boolean)
-    .join(". ");
+  const relatedStories = allStories
+    .filter((item) => asString(item.slug) !== storySlug)
+    .filter((item) => asString(item.category, "General") === category)
+    .slice(0, 4);
 
   return (
-    <main className="mx-auto max-w-7xl px-6 pb-20 pt-10 text-white lg:px-8">
-      <section className="rounded-[2.5rem] border border-white/10 bg-card p-8 md:p-10">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="rounded-full bg-platinumGold/10 px-4 py-2 text-sm text-platinumGold">
-            {safeString(rawStory.category_name) ||
-              safeString(rawStory.category) ||
-              "Story"}
-          </span>
+    <main className="min-h-screen bg-[#050816] px-6 py-10 text-white">
+      <div className="mx-auto max-w-7xl space-y-10">
+        <section className="rounded-[2rem] border border-white/10 bg-white/5 p-8 md:p-10">
+          <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-sm uppercase tracking-[0.35em] text-[#d4b26a]">
+                Story detail
+              </p>
 
-          <span className="rounded-full bg-white/5 px-4 py-2 text-sm text-slate-300">
-            {safeString(rawStory.published_at) || "Not published yet"}
-          </span>
+              <h1 className="mt-4 text-4xl font-bold md:text-6xl">{title}</h1>
 
-          <span className="rounded-full bg-white/5 px-4 py-2 text-sm text-slate-300">
-            {formatDuration(story.duration_seconds)}
-          </span>
+              <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-300">
+                <span className="rounded-full border border-white/10 px-4 py-2">
+                  {category}
+                </span>
 
-          <span className="rounded-full bg-white/5 px-4 py-2 text-sm text-slate-300">
-            {scenes.length > 0 ? `${scenes.length} chapters` : "No chapters"}
-          </span>
-        </div>
+                <span className="rounded-full border border-white/10 px-4 py-2">
+                  {featured ? "Featured" : "Standard"}
+                </span>
 
-        <h1 className="mt-6 text-4xl font-bold leading-tight md:text-6xl">
-          {story.title}
-        </h1>
+                <span className="rounded-full border border-white/10 px-4 py-2">
+                  {storySlug}
+                </span>
+              </div>
 
-        <p className="mt-6 max-w-4xl text-xl leading-9 text-slate-300">
-          {story.short_description ||
-            story.story_summary ||
-            "Hakuna maelezo mafupi ya story hii bado."}
-        </p>
-      </section>
+              <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
+                {description}
+              </p>
 
-      <section className="mt-10 grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="space-y-8">
-          <StoryCinematicPlayer
-            title={story.title}
-            narrationUrl={narrationUrl}
-            posterUrl={posterUrl}
-            ambienceUrl={ambienceUrl}
-            musicUrl={musicUrl}
-            scenes={scenes}
-            fallbackText={fallbackText}
-          />
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link
+                  href="/stories"
+                  className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                >
+                  Stories zote
+                </Link>
 
-          <section className="rounded-[2rem] border border-white/10 bg-card p-8">
-            <p className="text-xs uppercase tracking-[0.35em] text-platinumGold">
-              Story summary
+                <Link
+                  href={`/admin/stories/${id}/edit`}
+                  className="rounded-full bg-[#d4b26a] px-5 py-3 text-sm font-semibold text-black transition hover:opacity-90"
+                >
+                  Edit story
+                </Link>
+              </div>
+            </div>
+
+            <div className="w-full max-w-xl rounded-[1.75rem] border border-white/10 bg-[#081121] p-5">
+              <p className="text-sm uppercase tracking-[0.3em] text-[#d4b26a]">
+                Cinematic player
+              </p>
+
+              <div className="mt-5">
+                <StoryCinematicPlayer
+                  storyTitle={title}
+                  narrationUrl={narrationUrl || undefined}
+                  subtitleUrl={subtitleUrl || undefined}
+                  posterUrl={posterUrl || undefined}
+                  ambianceUrl={ambianceUrl || undefined}
+                  musicUrl={musicUrl || undefined}
+                  scenes={scenes}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-8 xl:grid-cols-[1.25fr,0.75fr]">
+          <div className="rounded-[2rem] border border-white/10 bg-white/5 p-8">
+            <p className="text-sm uppercase tracking-[0.35em] text-[#d4b26a]">
+              Story script
             </p>
 
-            <div className="mt-5 space-y-5 text-lg leading-9 text-slate-200">
-              <p>
-                {story.story_summary ||
-                  story.short_description ||
-                  "Muhtasari wa kina wa story hii bado haujaongezwa."}
-              </p>
+            <div className="mt-6 whitespace-pre-wrap text-base leading-8 text-slate-200">
+              {body || "Hakuna maandishi ya story kwa sasa."}
             </div>
-          </section>
+          </div>
 
-          <section className="rounded-[2rem] border border-white/10 bg-card p-8">
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-xs uppercase tracking-[0.35em] text-platinumGold">
+          <div className="space-y-8">
+            <section className="rounded-[2rem] border border-white/10 bg-white/5 p-8">
+              <p className="text-sm uppercase tracking-[0.35em] text-[#d4b26a]">
+                Media status
+              </p>
+
+              <div className="mt-5 space-y-3 text-sm text-slate-300">
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#081121] px-4 py-3">
+                  <span>Narration</span>
+                  <span>{narrationUrl ? "Ready" : "Missing"}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#081121] px-4 py-3">
+                  <span>Subtitle</span>
+                  <span>{subtitleUrl ? "Ready" : "Missing"}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#081121] px-4 py-3">
+                  <span>Poster</span>
+                  <span>{posterUrl ? "Ready" : "Missing"}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#081121] px-4 py-3">
+                  <span>Ambience</span>
+                  <span>{ambianceUrl ? "Ready" : "Missing"}</span>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#081121] px-4 py-3">
+                  <span>Music</span>
+                  <span>{musicUrl ? "Ready" : "Missing"}</span>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-white/10 bg-white/5 p-8">
+              <p className="text-sm uppercase tracking-[0.35em] text-[#d4b26a]">
                 Gallery
               </p>
-              <p className="text-sm text-slate-400">
-                {galleryImages.length > 0
-                  ? `${galleryImages.length} images`
-                  : "No gallery yet"}
-              </p>
-            </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
               {galleryImages.length > 0 ? (
-                galleryImages.map((image, index) => (
-                  <div
-                    key={`${image}-${index}`}
-                    className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-background/40"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={image}
-                      alt={`${story.title} gallery ${index + 1}`}
-                      className="h-64 w-full object-cover"
-                    />
-                  </div>
-                ))
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  {galleryImages.map((image, index) => (
+                    <div
+                      key={`${image}-${index}`}
+                      className="overflow-hidden rounded-2xl border border-white/10 bg-[#081121]"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={image}
+                        alt={`${title} gallery ${index + 1}`}
+                        className="h-36 w-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <div className="rounded-[1.5rem] border border-dashed border-white/10 p-6 text-slate-400 md:col-span-2">
-                  Hakuna gallery images bado kwa story hii.
+                <div className="mt-5 rounded-2xl border border-dashed border-white/10 bg-[#081121] p-5 text-sm text-slate-400">
+                  Hakuna gallery images kwa sasa.
                 </div>
               )}
-            </div>
-          </section>
-        </div>
+            </section>
+          </div>
+        </section>
 
-        <div className="space-y-8">
-          <section className="rounded-[2rem] border border-white/10 bg-card p-8">
-            <p className="text-xs uppercase tracking-[0.35em] text-platinumGold">
-              Story info
-            </p>
-
-            <div className="mt-6 space-y-4">
-              <div className="rounded-2xl border border-white/10 bg-background/40 p-4">
-                <p className="text-sm text-slate-400">Title</p>
-                <p className="mt-2 text-lg font-semibold text-white">
-                  {story.title}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-background/40 p-4">
-                <p className="text-sm text-slate-400">Slug</p>
-                <p className="mt-2 text-lg font-semibold text-white">
-                  {story.slug}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-background/40 p-4">
-                <p className="text-sm text-slate-400">Duration</p>
-                <p className="mt-2 text-lg font-semibold text-white">
-                  {formatDuration(story.duration_seconds)}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-background/40 p-4">
-                <p className="text-sm text-slate-400">Status</p>
-                <p className="mt-2 text-lg font-semibold text-white">
-                  {story.status || "draft"}
-                </p>
-              </div>
-            </div>
-          </section>
-
-          <section className="rounded-[2rem] border border-white/10 bg-card p-8">
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-xs uppercase tracking-[0.35em] text-platinumGold">
+        <section className="rounded-[2rem] border border-white/10 bg-white/5 p-8">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm uppercase tracking-[0.35em] text-[#d4b26a]">
                 Related stories
               </p>
-              <Link
-                href="/stories"
-                className="text-sm font-semibold text-platinumGold hover:underline"
-              >
-                Tazama zote
-              </Link>
+              <h2 className="mt-3 text-3xl font-bold">Stories zinazofanana</h2>
             </div>
 
-            <div className="mt-6 space-y-4">
-              {relatedStories.length > 0 ? (
-                relatedStories.slice(0, 4).map((item, index) => (
-                  <Link
-                    key={item.id || item.slug || `related-${index}`}
-                    href={`/stories/${item.slug}`}
-                    className="block rounded-[1.25rem] border border-white/10 bg-background/40 p-4 transition hover:border-platinumGold/30"
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <h3 className="font-semibold text-white">{item.title}</h3>
-                      <span className="text-sm text-slate-400">
-                        {formatDuration(item.duration_seconds)}
-                      </span>
-                    </div>
+            <Link
+              href="/stories"
+              className="rounded-full border border-white/15 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              Fungua zote
+            </Link>
+          </div>
 
-                    <p className="mt-3 line-clamp-3 text-sm leading-7 text-slate-300">
-                      {item.short_description ||
-                        item.story_summary ||
-                        "Simulizi jingine la kweli la kihistoria."}
+          {relatedStories.length > 0 ? (
+            <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {relatedStories.map((item) => {
+                const related = item as Record<string, unknown>;
+                const relatedTitle = asString(related.title, "Untitled story");
+                const relatedSlug = asString(related.slug);
+                const relatedCategory = asString(related.category, "General");
+                const relatedDescription = pickStoryDescription(related);
+
+                return (
+                  <Link
+                    key={relatedSlug || relatedTitle}
+                    href={relatedSlug ? `/stories/${relatedSlug}` : "/stories"}
+                    className="rounded-[1.5rem] border border-white/10 bg-[#081121] p-5 transition hover:border-[#d4b26a]/40"
+                  >
+                    <p className="text-xs uppercase tracking-[0.25em] text-[#d4b26a]">
+                      {relatedCategory}
+                    </p>
+
+                    <h3 className="mt-3 text-lg font-semibold text-white">
+                      {relatedTitle}
+                    </h3>
+
+                    <p className="mt-3 text-sm leading-7 text-slate-400">
+                      {relatedDescription}
                     </p>
                   </Link>
-                ))
-              ) : (
-                <div className="rounded-[1.25rem] border border-dashed border-white/10 p-5 text-slate-400">
-                  Hakuna related stories kwa sasa.
-                </div>
-              )}
+                );
+              })}
             </div>
-          </section>
-        </div>
-      </section>
+          ) : (
+            <div className="mt-8 rounded-[1.25rem] border border-dashed border-white/10 p-5 text-slate-400">
+              Hakuna related stories kwa sasa.
+            </div>
+          )}
+        </section>
+      </div>
     </main>
   );
 }
