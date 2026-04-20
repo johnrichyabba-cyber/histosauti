@@ -9,6 +9,14 @@ type StoryPageProps = {
   }>;
 };
 
+type SceneItem = {
+  id: string;
+  title: string;
+  text: string;
+  imageUrl?: string;
+  duration?: number;
+};
+
 function asString(value: unknown, fallback = ""): string {
   if (typeof value === "string") return value;
   if (typeof value === "number") return String(value);
@@ -26,32 +34,36 @@ function asStringArray(value: unknown): string[] {
     .filter((item) => item.trim().length > 0);
 }
 
-function asScenes(value: unknown) {
+function asScenes(value: unknown): SceneItem[] {
   if (!Array.isArray(value)) return [];
-  return value
-    .map((scene, index) => {
-      if (!scene || typeof scene !== "object") return null;
 
-      const item = scene as Record<string, unknown>;
+  const scenes: SceneItem[] = [];
 
-      return {
-        id: asString(item.id, `scene-${index + 1}`),
-        title: asString(item.title, `Scene ${index + 1}`),
-        text:
-          asString(item.text) ||
-          asString(item.description) ||
-          asString(item.caption),
-        imageUrl:
-          asString(item.imageUrl) ||
-          asString(item.image_url) ||
-          asString(item.image),
-        duration:
-          typeof item.duration === "number"
-            ? item.duration
-            : Number(item.duration ?? 0) || undefined,
-      };
-    })
-    .filter(Boolean);
+  value.forEach((scene, index) => {
+    if (!scene || typeof scene !== "object") return;
+
+    const item = scene as Record<string, unknown>;
+
+    scenes.push({
+      id: asString(item.id, `scene-${index + 1}`),
+      title: asString(item.title, `Scene ${index + 1}`),
+      text:
+        asString(item.text) ||
+        asString(item.description) ||
+        asString(item.caption),
+      imageUrl:
+        asString(item.imageUrl) ||
+        asString(item.image_url) ||
+        asString(item.image) ||
+        undefined,
+      duration:
+        typeof item.duration === "number"
+          ? item.duration
+          : Number(item.duration ?? 0) || undefined,
+    });
+  });
+
+  return scenes;
 }
 
 function pickStoryDescription(story: Record<string, unknown>) {
