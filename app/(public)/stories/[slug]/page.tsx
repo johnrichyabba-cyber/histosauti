@@ -1,20 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import StoryCinematicPlayer from "@/components/story-cinematic-player";
 import { getStories } from "@/lib/stories";
 
 type StoryPageProps = {
   params: Promise<{
     slug: string;
   }>;
-};
-
-type SceneItem = {
-  id: string;
-  title: string;
-  text: string;
-  imageUrl?: string;
-  duration?: number;
 };
 
 function asString(value: unknown, fallback = ""): string {
@@ -33,6 +24,14 @@ function asStringArray(value: unknown): string[] {
     .map((item) => asString(item))
     .filter((item) => item.trim().length > 0);
 }
+
+type SceneItem = {
+  id: string;
+  title: string;
+  text: string;
+  imageUrl?: string;
+  duration?: number;
+};
 
 function asScenes(value: unknown): SceneItem[] {
   if (!Array.isArray(value)) return [];
@@ -70,7 +69,6 @@ function pickStoryDescription(story: Record<string, unknown>) {
   return (
     asString(story.short_description) ||
     asString(story.description) ||
-    asString(story.summary) ||
     asString(story.body).slice(0, 220) ||
     asString(story.content).slice(0, 220) ||
     "Hakuna maelezo ya story kwa sasa."
@@ -107,7 +105,8 @@ export default async function StoryDetailPage({ params }: StoryPageProps) {
   const body = pickStoryBody(story);
 
   const subtitleUrl = asString(story.subtitle_url);
-  const narrationUrl = asString(story.audio_url);
+  const narrationUrl =
+    asString(story.audio_url) || asString(story.narration_url);
   const posterUrl =
     asString(story.poster_url) ||
     asString(story.cover_image_url) ||
@@ -173,19 +172,47 @@ export default async function StoryDetailPage({ params }: StoryPageProps) {
 
             <div className="w-full max-w-xl rounded-[1.75rem] border border-white/10 bg-[#081121] p-5">
               <p className="text-sm uppercase tracking-[0.3em] text-[#d4b26a]">
-                Cinematic player
+                Audio player
               </p>
 
-              <div className="mt-5">
-                <StoryCinematicPlayer
-                  storyTitle={title}
-                  narrationUrl={narrationUrl || undefined}
-                  subtitleUrl={subtitleUrl || undefined}
-                  posterUrl={posterUrl || undefined}
-                  ambianceUrl={ambianceUrl || undefined}
-                  musicUrl={musicUrl || undefined}
-                  scenes={scenes}
-                />
+              <div className="mt-5 space-y-5">
+                {posterUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={posterUrl}
+                    alt={title}
+                    className="h-64 w-full rounded-2xl object-cover"
+                  />
+                ) : (
+                  <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-[#0d1728] text-slate-400">
+                    Hakuna poster image
+                  </div>
+                )}
+
+                {narrationUrl ? (
+                  <div className="rounded-2xl border border-white/10 bg-[#0d1728] p-4">
+                    <p className="mb-3 text-sm font-semibold text-slate-300">
+                      Sikiliza narration
+                    </p>
+                    <audio controls className="w-full" preload="metadata">
+                      <source src={narrationUrl} />
+                      Browser yako haisupport audio player.
+                    </audio>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-[#0d1728] p-4 text-sm text-slate-400">
+                    Hakuna narration audio kwa sasa.
+                  </div>
+                )}
+
+                {subtitleUrl ? (
+                  <div className="rounded-2xl border border-white/10 bg-[#0d1728] p-4 text-sm text-slate-300">
+                    <p className="font-semibold text-white">Subtitle file</p>
+                    <p className="mt-2 break-all text-slate-400">
+                      {subtitleUrl}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -234,6 +261,34 @@ export default async function StoryDetailPage({ params }: StoryPageProps) {
                   <span>{musicUrl ? "Ready" : "Missing"}</span>
                 </div>
               </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-white/10 bg-white/5 p-8">
+              <p className="text-sm uppercase tracking-[0.35em] text-[#d4b26a]">
+                Scenes
+              </p>
+
+              {scenes.length > 0 ? (
+                <div className="mt-5 space-y-4">
+                  {scenes.map((scene) => (
+                    <div
+                      key={scene.id}
+                      className="rounded-2xl border border-white/10 bg-[#081121] p-4"
+                    >
+                      <p className="text-sm font-semibold text-white">
+                        {scene.title}
+                      </p>
+                      <p className="mt-2 text-sm leading-7 text-slate-400">
+                        {scene.text || "Hakuna scene text."}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-white/10 bg-[#081121] p-5 text-sm text-slate-400">
+                  Hakuna scenes kwa sasa.
+                </div>
+              )}
             </section>
 
             <section className="rounded-[2rem] border border-white/10 bg-white/5 p-8">
