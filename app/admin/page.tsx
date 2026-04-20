@@ -23,9 +23,16 @@ export default async function AdminHomePage() {
     recentStories,
     recentPublished,
     draftQueue,
-    categoriesWithCounts,
     latestPublishedAt,
   } = overview;
+
+  const quickCategoryPreview = Array.from(
+    new Set(
+      recentStories
+        .map((story) => story.category)
+        .filter((value): value is string => Boolean(value && value.trim())),
+    ),
+  ).slice(0, 6);
 
   return (
     <main className="min-h-screen bg-[#050816] px-6 py-10 text-white">
@@ -240,26 +247,26 @@ export default async function AdminHomePage() {
 
             <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-6">
               <p className="text-sm uppercase tracking-[0.25em] text-[#d4b26a]">
-                Categories
+                Quick category preview
               </p>
               <div className="mt-4 space-y-3">
-                {categoriesWithCounts.length > 0 ? (
-                  categoriesWithCounts.map((category) => (
+                {quickCategoryPreview.length > 0 ? (
+                  quickCategoryPreview.map((categoryName) => (
                     <div
-                      key={category.id}
+                      key={categoryName}
                       className="flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-[#081121] p-3"
                     >
                       <span className="font-medium text-white">
-                        {category.name}
+                        {categoryName}
                       </span>
                       <span className="rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
-                        {category.story_count ?? 0}
+                        Category
                       </span>
                     </div>
                   ))
                 ) : (
                   <p className="text-sm text-slate-400">
-                    Hakuna categories bado.
+                    Hakuna categories za preview kwa sasa.
                   </p>
                 )}
               </div>
