@@ -114,13 +114,14 @@ export default async function CategoriesPage({
                               <h3 className="font-semibold text-white">
                                 {story.title}
                               </h3>
-                              <p className="mt-2 line-clamp-2 text-sm text-slate-400">
-                                {story.summary}
+                              <p className="mt-2 text-sm text-slate-400">
+                                {story.category || "General"} •{" "}
+                                {story.duration || "—"}
                               </p>
                             </div>
 
                             <span className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
-                              {story.duration || "—"}
+                              Open
                             </span>
                           </div>
                         </Link>
