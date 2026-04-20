@@ -1,142 +1,157 @@
 import Link from "next/link";
-import { getCategoriesWithCounts, getLatestStories } from "@/lib/stories";
+import { getCategories, getStories } from "@/lib/stories";
 
-export default async function CategoriesPage() {
+export const dynamic = "force-dynamic";
+
+type CategoryPageProps = {
+  searchParams?: Promise<{
+    q?: string;
+  }>;
+};
+
+function normalize(value: string) {
+  return value.trim().toLowerCase();
+}
+
+export default async function CategoriesPage({
+  searchParams,
+}: CategoryPageProps) {
+  const params = searchParams ? await searchParams : undefined;
+  const query = params?.q?.trim() ?? "";
+
   const [categories, latestStories] = await Promise.all([
-    getCategoriesWithCounts(),
-    getLatestStories(12),
+    getCategories(),
+    getStories(),
   ]);
 
+  const filteredCategories = categories.filter((category) => {
+    if (!query) return true;
+
+    const haystack = [
+      category.name ?? "",
+      String(category.story_count ?? ""),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(normalize(query));
+  });
+
   return (
-    <main className="mx-auto max-w-7xl px-6 pb-20 pt-10 text-white lg:px-8">
-      <section className="rounded-[2.5rem] border border-white/10 bg-card p-8 md:p-10">
-        <p className="text-xs uppercase tracking-[0.35em] text-platinumGold">
-          Categories
-        </p>
+    <main className="min-h-screen bg-[#050816] px-6 py-10 text-white">
+      <div className="mx-auto max-w-7xl">
+        <section className="rounded-[2rem] border border-white/10 bg-white/5 p-8 shadow-2xl shadow-black/20 md:p-12">
+          <p className="mb-3 text-sm uppercase tracking-[0.35em] text-[#d4b26a]">
+            Categories
+          </p>
+          <h1 className="text-4xl font-bold md:text-6xl">
+            Chunguza categories za HistoSauti
+          </h1>
+          <p className="mt-4 max-w-3xl text-base leading-8 text-slate-300 md:text-lg">
+            Tafuta na fungua simulizi kulingana na mada zake. Kila category
+            inaonyesha stories zake za karibu ili mtumiaji afike haraka kwenye
+            anachotaka kusikiliza.
+          </p>
 
-        <h1 className="mt-4 text-4xl font-bold leading-tight md:text-6xl">
-          Chunguza simulizi kwa mada
-        </h1>
-
-        <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300">
-          Hapa unaweza kuchagua simulizi kulingana na aina ya tukio, hisia,
-          historia, au mtazamo wa documentary unaoutaka.
-        </p>
-      </section>
-
-      <section className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {categories.length > 0 ? (
-          categories.map((category, index) => {
-            const relatedStories = latestStories.filter(
-              (story) => story.category_id === category.id,
-            );
-
-            return (
-              <div
-                key={category.id || category.slug || `category-${index}`}
-                className="rounded-[2rem] border border-white/10 bg-card p-6"
+          <form className="mt-8">
+            <div className="flex flex-col gap-3 md:flex-row">
+              <input
+                type="text"
+                name="q"
+                defaultValue={query}
+                placeholder="Tafuta category..."
+                className="w-full rounded-full border border-white/10 bg-[#081121] px-5 py-3 text-white outline-none placeholder:text-slate-500"
+              />
+              <button
+                type="submit"
+                className="rounded-full bg-[#d4b26a] px-6 py-3 font-semibold text-black transition hover:opacity-90"
               >
-                <div className="flex items-center justify-between gap-4">
-                  <h2 className="text-2xl font-bold text-white">
-                    {category.name}
-                  </h2>
+                Tafuta
+              </button>
+            </div>
+          </form>
+        </section>
 
-                  <span className="rounded-full bg-platinumGold/10 px-3 py-1 text-sm text-platinumGold">
-                    {category.story_count}
-                  </span>
-                </div>
+        <section className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {filteredCategories.length > 0 ? (
+            filteredCategories.map((category, index) => {
+              const relatedStories = latestStories.filter(
+                (story) =>
+                  (story.category ?? "").trim().toLowerCase() ===
+                  (category.name ?? "").trim().toLowerCase(),
+              );
 
-                <p className="mt-4 text-slate-300">
-                  {category.description || "Hakuna maelezo ya category bado."}
-                </p>
+              return (
+                <div
+                  key={category.id || `category-${index}`}
+                  className="rounded-[1.5rem] border border-white/10 bg-white/5 p-6 shadow-xl shadow-black/10"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.35em] text-[#d4b26a]">
+                        Category
+                      </p>
+                      <h2 className="mt-2 text-2xl font-bold text-white">
+                        {category.name}
+                      </h2>
+                    </div>
 
-                <div className="mt-6">
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
-                    Stories za karibu
-                  </p>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-slate-300">
+                      {category.story_count ?? 0} stories
+                    </span>
+                  </div>
 
-                  <div className="mt-4 space-y-3">
+                  <div className="mt-6 space-y-3">
                     {relatedStories.length > 0 ? (
-                      relatedStories.slice(0, 3).map((story, storyIndex) => (
+                      relatedStories.slice(0, 4).map((story) => (
                         <Link
-                          key={story.id || story.slug || `story-${storyIndex}`}
+                          key={story.id}
                           href={`/stories/${story.slug}`}
-                          className="block rounded-2xl border border-white/10 bg-background/40 px-4 py-3 transition hover:border-platinumGold/30 hover:text-platinumGold"
+                          className="block rounded-2xl border border-white/10 bg-[#081121] p-4 transition hover:border-[#d4b26a]/40 hover:bg-white/5"
                         >
-                          <div className="flex items-center justify-between gap-3">
-                            <span className="font-medium text-white">
-                              {story.title}
-                            </span>
-                            <span className="text-xs text-slate-400">
-                              {story.duration_seconds
-                                ? `${Math.max(
-                                    1,
-                                    Math.round(story.duration_seconds / 60),
-                                  )} min`
-                                : "12 min"}
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <h3 className="font-semibold text-white">
+                                {story.title}
+                              </h3>
+                              <p className="mt-2 line-clamp-2 text-sm text-slate-400">
+                                {story.summary}
+                              </p>
+                            </div>
+
+                            <span className="shrink-0 rounded-full border border-white/10 px-3 py-1 text-xs text-slate-300">
+                              {story.duration || "—"}
                             </span>
                           </div>
                         </Link>
                       ))
                     ) : (
-                      <div className="rounded-2xl border border-dashed border-white/10 px-4 py-4 text-sm text-slate-400">
-                        Hakuna stories za category hii bado.
+                      <div className="rounded-2xl border border-dashed border-white/10 bg-[#081121] p-4 text-sm text-slate-400">
+                        Hakuna stories bado ndani ya category hii.
                       </div>
                     )}
                   </div>
-                </div>
 
-                <div className="mt-6 flex items-center justify-between">
-                  <span className="text-sm text-slate-400">
-                    {category.slug}
-                  </span>
-                  <Link
-                    href="/stories"
-                    className="text-sm font-semibold text-platinumGold hover:underline"
-                  >
-                    Tazama zaidi →
-                  </Link>
+                  <div className="mt-6">
+                    <Link
+                      href={`/stories`}
+                      className="inline-flex rounded-full bg-[#d4b26a] px-5 py-3 text-sm font-semibold text-black transition hover:opacity-90"
+                    >
+                      Fungua stories zote
+                    </Link>
+                  </div>
                 </div>
+              );
+            })
+          ) : (
+            <div className="md:col-span-2 xl:col-span-3">
+              <div className="rounded-[1.5rem] border border-dashed border-white/10 bg-white/5 p-10 text-center text-slate-400">
+                Hakuna categories zilizopatikana kwa sasa.
               </div>
-            );
-          })
-        ) : (
-          <div className="rounded-[2rem] border border-dashed border-white/10 bg-card p-8 text-slate-400 md:col-span-2 xl:col-span-3">
-            Hakuna categories bado. Ongeza categories kupitia admin au data source yako.
-          </div>
-        )}
-      </section>
-
-      <section className="mt-12 rounded-[2rem] border border-white/10 bg-background/40 p-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-platinumGold">
-              Continue
-            </p>
-            <h2 className="mt-3 text-3xl font-bold">Endelea kusikiliza</h2>
-            <p className="mt-3 max-w-2xl text-slate-300">
-              Rudi kwenye stories zote au fungua admin kuongeza simulizi mpya,
-              media, narration, na research ya OpenAI.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-4">
-            <Link
-              href="/stories"
-              className="rounded-full bg-platinumGold px-6 py-3 font-semibold text-black transition hover:scale-[1.02]"
-            >
-              Tazama stories
-            </Link>
-
-            <Link
-              href="/admin"
-              className="rounded-full border border-white/10 px-6 py-3 font-semibold text-white transition hover:border-platinumGold/30 hover:text-platinumGold"
-            >
-              Fungua admin
-            </Link>
-          </div>
-        </div>
-      </section>
+            </div>
+          )}
+        </section>
+      </div>
     </main>
   );
 }
