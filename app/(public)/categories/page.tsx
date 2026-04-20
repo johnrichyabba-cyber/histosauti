@@ -115,8 +115,7 @@ export default async function CategoriesPage({
                                 {story.title}
                               </h3>
                               <p className="mt-2 text-sm text-slate-400">
-                                {story.category || "General"} •{" "}
-                                {story.duration || "—"}
+                                {story.category || "General"} {"•"} {"-"}
                               </p>
                             </div>
 
